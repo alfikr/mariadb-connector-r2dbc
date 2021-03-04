@@ -93,8 +93,8 @@ public class TlsTest extends BaseConnectionTest {
   void defaultHasNoSSL() throws Exception {
     Assumptions.assumeTrue(
         !"maxscale".equals(System.getenv("srv"))
-                && !"skysql".equals(System.getenv("srv"))
-                && !"skysql-ha".equals(System.getenv("srv")));
+            && !"skysql".equals(System.getenv("srv"))
+            && !"skysql-ha".equals(System.getenv("srv")));
     Assumptions.assumeTrue(haveSsl(sharedConn));
     sharedConn
         .createStatement("SHOW STATUS like 'Ssl_version'")
@@ -250,9 +250,9 @@ public class TlsTest extends BaseConnectionTest {
   @Test
   void fullWithoutServerCert() throws Exception {
     Assumptions.assumeTrue(
-            !"maxscale".equals(System.getenv("srv"))
-                    && !"skysql".equals(System.getenv("srv"))
-                    && !"skysql-ha".equals(System.getenv("srv")));
+        !"maxscale".equals(System.getenv("srv"))
+            && !"skysql".equals(System.getenv("srv"))
+            && !"skysql-ha".equals(System.getenv("srv")));
     Assumptions.assumeTrue(haveSsl(sharedConn));
     assertThrows(
         R2dbcTransientResourceException.class,

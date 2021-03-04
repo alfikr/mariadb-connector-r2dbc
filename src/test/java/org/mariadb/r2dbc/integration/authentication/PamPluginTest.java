@@ -33,6 +33,7 @@ public class PamPluginTest extends BaseConnectionTest {
     // /etc/pam.d/mariadb pam configuration is created beforehand
     Assumptions.assumeTrue(
         System.getenv("TRAVIS") != null
+            && System.getenv("TEST_PAM_USER") != null
             && !"maxscale".equals(System.getenv("srv"))
             && !"skysql".equals(System.getenv("srv"))
             && !"skysql-ha".equals(System.getenv("srv")));
@@ -51,7 +52,11 @@ public class PamPluginTest extends BaseConnectionTest {
     sharedConn.createStatement("FLUSH PRIVILEGES").execute().blockLast();
 
     MariadbConnectionConfiguration conf =
-        TestConfiguration.defaultBuilder.clone().username("testPam").password("myPwd").build();
+        TestConfiguration.defaultBuilder
+            .clone()
+            .username(System.getenv("TEST_PAM_USER"))
+            .password(System.getenv("TEST_PAM_PWD"))
+            .build();
     MariadbConnection connection = new MariadbConnectionFactory(conf).create().block();
     connection.close().block();
   }

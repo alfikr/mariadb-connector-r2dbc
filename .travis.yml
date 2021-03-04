@@ -1,25 +1,37 @@
-#dist: trusty
-sudo: false
+os: linux
 language: java
 services: docker
+jdk: openjdk11
 addons:
   hosts:
     - mariadb.example.com
-jdk: openjdk11
-install:
-#  - echo "MAVEN_OPTS='-Xmx2g -XX:MaxPermSize=512m'" > ~/.mavenrc
-  - git clone https://github.com/rusher/connector-test-machine.git
-  - source connector-test-machine/launch.sh -t "$srv" -v "$v" -d testr2
-  - echo "server launched"
 
-matrix:
+before_install:
+  - git clone https://github.com/rusher/connector-test-machine.git
+
+install:
+  - |-
+    case $TRAVIS_OS_NAME in
+      windows)
+        choco install openjdk11 maven
+        export PATH=$(cmd.exe //c "refreshenv > nul & C:\Progra~1\Git\bin\bash -c 'echo \$PATH' ")
+        connector-test-machine/launch.bat -t "$srv" -v "$v" -d testr2
+        ;;
+      linux)
+        source connector-test-machine/launch.sh -t "$srv" -v "$v" -d testr2
+        ;;
+    esac
+
+jobs:
+  fast_finish: true
   allow_failures:
     - env: srv=build v=10.6
-    - env: srv=mysql v=5.7
-    - env: srv=mysql v=8.0
-  include:
     - env: srv=skysql
     - env: srv=skysql-ha
+  include:
+    - env: srv=mariadb v=10.5
+      os: windows
+      language: shell
     - env: srv=mariadb v=10.2
     - env: srv=mariadb v=10.3
     - env: srv=mariadb v=10.4
@@ -27,15 +39,29 @@ matrix:
     - env: srv=mariadb v=10.5 NO_BACKSLASH_ESCAPES=true
     - env: srv=mariadb v=10.5 BENCH=1
     - env: srv=maxscale
+    - env: srv=skysql
+    - env: srv=skysql-ha
     - env: srv=build v=10.6
     - env: srv=mysql v=5.7
     - env: srv=mysql v=8.0
 
 script:
-  - mvn clean -Dmaven.test.skip > /dev/null
-  - if [ -n "$BENCH" ] ; then mvn package -P bench -Dmaven.test.skip; fi
-  - if [ -n "$BENCH" ] ; then java -Duser.country=US -Duser.language=en -DTEST_PORT=$TEST_DB_PORT -DTEST_HOST=$TEST_DB_HOST -DTEST_USERNAME=$TEST_DB_USER -DTEST_PASSWORD=$TEST_DB_PASSWORD -jar target/benchmarks.jar; fi
-  - if [ -z "$BENCH" ] ; then MAVEN_SKIP_RC=true MAVEN_OPTS="-Xmx2g -XX:MaxPermSize=512m" mvn test -DjobId=${TRAVIS_JOB_ID}; fi
+  - |-
+    case $TRAVIS_OS_NAME in
+      windows)
+        mvn clean -Dmaven.test.skip
+        mvn test -DRUN_LONG_TEST=false
+        ;;
+      linux)
+        mvn clean -Dmaven.test.skip > /dev/null
+        if [ -n "$BENCH" ] ; then
+          mvn package -P bench -Dmaven.test.skip
+          java -Duser.country=US -Duser.language=en -DTEST_PORT=$TEST_DB_PORT -DTEST_HOST=$TEST_DB_HOST -DTEST_USERNAME=$TEST_DB_USER -DTEST_PASSWORD=$TEST_DB_PASSWORD -jar target/benchmarks.jar
+        else
+          MAVEN_SKIP_RC=true MAVEN_OPTS="-Xmx2g -XX:MaxPermSize=512m" mvn test -DjobId=${TRAVIS_JOB_ID}
+        fi
+        ;;
+    esac
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
