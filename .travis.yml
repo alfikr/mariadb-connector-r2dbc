@@ -18,12 +18,15 @@ install:
         connector-test-machine/launch.bat -t "$srv" -v "$v" -d testr2
         ;;
       linux)
-        trap "source connector-test-machine/launch.sh -t \"$srv\" -v \"$v\" -d testr2" EXIT
+        source connector-test-machine/launch.sh -t "$srv" -v "$v" -d testr2
         ;;
     esac
 
 jobs:
   fast_finish: true
+  allow_failures:
+    - env: srv=skysql
+    - env: srv=skysql-ha
   include:
     - env: srv=mariadb v=10.5
       os: windows
@@ -44,23 +47,21 @@ jobs:
 
 script:
   - |-
-    if [ -n "$TEST_DB_USER" ] ; then
-      case $TRAVIS_OS_NAME in
-        windows)
-          mvn clean -Dmaven.test.skip
-          mvn test -DRUN_LONG_TEST=false
-          ;;
-        linux)
-          mvn clean -Dmaven.test.skip > /dev/null
-          if [ -n "$BENCH" ] ; then
-            mvn package -P bench -Dmaven.test.skip
-            java -Duser.country=US -Duser.language=en -DTEST_PORT=$TEST_DB_PORT -DTEST_HOST=$TEST_DB_HOST -DTEST_USERNAME=$TEST_DB_USER -DTEST_PASSWORD=$TEST_DB_PASSWORD -jar target/benchmarks.jar
-          else
-            MAVEN_SKIP_RC=true MAVEN_OPTS="-Xmx2g -XX:MaxPermSize=512m" mvn test -DjobId=${TRAVIS_JOB_ID}
-          fi
-          ;;
-      esac
-    fi
+    case $TRAVIS_OS_NAME in
+      windows)
+        mvn clean -Dmaven.test.skip
+        mvn test -DRUN_LONG_TEST=false
+        ;;
+      linux)
+        mvn clean -Dmaven.test.skip > /dev/null
+        if [ -n "$BENCH" ] ; then
+          mvn package -P bench -Dmaven.test.skip
+          java -Duser.country=US -Duser.language=en -DTEST_PORT=$TEST_DB_PORT -DTEST_HOST=$TEST_DB_HOST -DTEST_USERNAME=$TEST_DB_USER -DTEST_PASSWORD=$TEST_DB_PASSWORD -jar target/benchmarks.jar
+        else
+          MAVEN_SKIP_RC=true MAVEN_OPTS="-Xmx2g -XX:MaxPermSize=512m" mvn test -DjobId=${TRAVIS_JOB_ID}
+        fi
+        ;;
+    esac
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
