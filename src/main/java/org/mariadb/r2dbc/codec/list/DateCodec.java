@@ -1,15 +1,20 @@
 package org.mariadb.r2dbc.codec.list;
 
 import io.netty.buffer.ByteBuf;
+import org.joda.time.DateTime;
 import org.mariadb.r2dbc.client.Context;
 import org.mariadb.r2dbc.codec.Codec;
 import org.mariadb.r2dbc.codec.DataType;
 import org.mariadb.r2dbc.message.server.ColumnDefinitionPacket;
 
 import java.nio.charset.StandardCharsets;
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.EnumSet;
 
@@ -62,21 +67,77 @@ public class DateCodec implements Codec<Date> {
 
     @Override
     public void encodeText(ByteBuf buf, Context context, Date value) {
-
+        buf.writeByte('\'');
+        buf.writeCharSequence(
+                new SimpleDateFormat("yyyy-MM-dd").format(value),StandardCharsets.US_ASCII
+        );
+        buf.writeByte('\'');
     }
 
     @Override
     public Date decodeBinary(ByteBuf buffer, int length, ColumnDefinitionPacket column, Class<? extends Date> type) {
-        return null;
+        int year =0;
+        int month =1;
+        int dayOfMonth=1;
+        switch (column.getType()){
+            case TIMESTAMP:
+            case DATETIME:
+                if(length>0){
+                    year=buffer.readUnsignedShortLE();
+                    month=buffer.readByte();
+                    dayOfMonth=buffer.readByte();
+                    if(length>4){
+                        buffer.skipBytes(length-4);
+                    }
+                    return Date.from(LocalDate.of(year,month,dayOfMonth).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant());
+                }
+                return null;
+            case YEAR:
+                if(length>0){
+                    year=buffer.readUnsignedShortLE();
+                    if (column.getLength() == 2) {
+                        // YEAR(2) - deprecated
+                        if (year <= 69) {
+                            year += 2000;
+                        } else {
+                            year += 1900;
+                        }
+                    }
+                    return Date.from(
+                            LocalDate.of(year,month,dayOfMonth)
+                                    .atStartOfDay()
+                                    .atZone(ZoneId.systemDefault())
+                                    .toInstant()
+                    );
+                }
+            default:
+                if (length > 0) {
+                    year = buffer.readUnsignedShortLE();
+                    month = buffer.readByte();
+                    dayOfMonth = buffer.readByte();
+                }
+                return Date.from(
+                        LocalDate.of(year,month,dayOfMonth)
+                                .atStartOfDay()
+                                .atZone(ZoneId.systemDefault())
+                                .toInstant()
+                );
+        }
     }
 
     @Override
     public void encodeBinary(ByteBuf buf, Context context, Date value) {
-
+        buf.writeByte(7);
+        Calendar calendar=Calendar.getInstance();
+        calendar.setTime(value);
+        buf.writeShortLE(calendar.get(Calendar.YEAR));
+        buf.writeByte(calendar.get(Calendar.MONTH));
+        buf.writeByte(calendar.get(Calendar.DAY_OF_MONTH));
+        buf.writeBytes(new byte[]{0,0,0});
     }
 
     @Override
     public DataType getBinaryEncodeType() {
-        return null;
+        return DataType.DATE;
     }
 }
